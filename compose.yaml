@@ -1,0 +1,41 @@
+services:
+
+  broker:
+    image: apache/activemq-artemis:2.42.0
+    container_name: activemq-broker
+    environment:
+      ARTEMIS_USER: labuser
+      ARTEMIS_PASSWORD: labpass
+      ANONYMOUS_LOGIN: "false"
+    ports:
+      - "8161:8161"
+      - "61613:61613"
+    networks:
+      - activemq-network
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    container_name: activemq-producer
+    command: sleep infinity
+    depends_on:
+      - broker
+    networks:
+      - activemq-network
+
+  consumer:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+    container_name: activemq-consumer
+    command: sleep infinity
+    depends_on:
+      - broker
+    networks:
+      - activemq-network
+
+networks:
+  activemq-network:
+    driver: bridge
+
