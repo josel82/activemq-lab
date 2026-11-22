@@ -270,11 +270,13 @@ node consumer.js
 Expected output:
 
 ```text
-Starting consumer...
+Starting ActiveMQ Consumer...
+Broker: ws://broker:61614
+Queue: /queue/lab.queue
+
 Connected to ActiveMQ!
-Listening on /queue/lab.queue
-Heartbeats enabled: 10 seconds
-Press CTRL+C to stop.
+Subscribed to /queue/lab.queue
+Waiting for messages...
 ```
 
 The Consumer is now listening for messages.
