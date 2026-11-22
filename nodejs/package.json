@@ -1,0 +1,7 @@
+{
+    "type": "module",
+    "dependencies": {
+        "@stomp/stompjs": "7.5.0",
+        "ws": "8.23.0"
+    }
+}

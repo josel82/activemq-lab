@@ -7,8 +7,10 @@ This project demonstrates basic message-based communication using three Docker c
 - **ActiveMQ Artemis** – Message broker
 - **Python Producer** – Sends messages to the broker
 - **Python Consumer** – Receives messages from the broker
+- **NodeJS Producer** - Another implementation of broker
+- **NodeJS Consumer** - Another implementation of consumer
 
-The Python applications are deliberately simple and interactive. You interact with them through a Bash shell inside their respective Docker containers.
+These applications are deliberately simple and interactive. You interact with them through a Bash shell inside their respective Docker containers.
 
 The goal is to understand the fundamentals of message brokers, queues, producers, consumers and asynchronous messaging without introducing unnecessary complexity.
 
@@ -19,31 +21,31 @@ The goal is to understand the fundamentals of message brokers, queues, producers
 The lab consists of three independent Docker containers connected through a Docker bridge network.
 
 ```text
-                  Docker Network
-                activemq-network
-                       
-       +-----------------------------+
-       |                             |
-       |      ActiveMQ Artemis       |
-       |          Broker             |
-       |                             |
-       |       STOMP : 61613         |
-       |       Web UI : 8161         |
-       |                             |
-       +-------------+---------------+
-                     |
-                     |
-              Queue: lab.queue
-                     |
-             +-------+-------+
-             |               |
-             v               ^
-      +-------------+  +-------------+
-      |   Producer  |  |   Consumer  |
-      |             |  |             |
-      | Python App  |  | Python App  |
-      |             |  |             |
-      +-------------+  +-------------+
+                              Docker Network
+                             activemq-network
+                       +-----------------------------+
+                       |                             |
+                       |      ActiveMQ Artemis       |
+                       |          Broker             |
+                       |                             |
+                       |       STOMP : 61613         |
+                       |     STOMP + WS : 61614      |
+                       |       Web UI : 8161         |
+                       |                             |
+                       +-------------+---------------+
+                                     |
+                                     |
+                             Queue: lab.queue
+                                     |
+             +-------+-------+-------+--------+-------+--------+
+             |               |                |                |
+             v               ^                v                ^
+      +-------------+  +-------------+  +-------------+  +-------------+
+      |   Producer  |  |   Consumer  |  |   Producer  |  |   Consumer  |
+      |             |  |             |  |             |  |             |
+      | Python App  |  | Python App  |  |  NodeJS App |  |  NodeJS App |
+      |             |  |             |  |             |  |             |
+      +-------------+  +-------------+  +-------------+  +-------------+
 ```
 
 **How it works:**
@@ -67,7 +69,10 @@ The Producer and Consumer never communicate directly. All messaging takes place 
 | Docker Compose | Container orchestration |
 | Apache ActiveMQ Artemis | Message broker |
 | Python 3.12 | Producer and Consumer applications |
+| NodeJS 27.0.0 | Producer and Consumer applications |
 | stomp.py | Python STOMP client |
+| stomp.js | STOMP over WebSocket library for browsers and Node.js |
+| ws | A NodeJS Websocket library |
 | STOMP 1.2 | Messaging protocol |
 
 ### Why STOMP?
@@ -89,7 +94,7 @@ Before starting, make sure you have:
 - Git installed
 - A Bash-compatible terminal
 
-No local Python installation is required. Python and its dependencies are installed inside the Docker containers.
+No local Python or NodeJS installation is required. Python, NodeJS and their dependencies are installed inside the Docker containers.
 
 ---
 
@@ -98,32 +103,49 @@ No local Python installation is required. Python and its dependencies are instal
 ```text
 activemq-lab/
 │
-├── docker-compose.yml
-│
-├── producer/
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── consumer/
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-└── python/
-    ├── producer.py
-    └── consumer.py
+├── broker
+│   └── broker.xml
+├── nodejs
+│   ├── package.json
+│   ├── consumer
+│   │   ├── Dockerfile
+│   │   └── consumer.js
+│   └── producer
+│       ├── Dockerfile
+│       └── producer.js
+├── python
+│   ├── consumer
+│   │   ├── Dockerfile
+│   │   ├── consumer.py
+│   │   └── requirements.txt
+│   └── producer
+│       ├── Dockerfile
+│       ├── producer.py
+│       └── requirements.txt
+├── compose.yaml
+├── nodejs-lab.yaml
+└── python-lab.yaml
 ```
 
 ### Components
 
 | File | Description |
 |---|---|
-| docker-compose.yml | Defines the three Docker services and network |
-| producer/Dockerfile | Builds the Producer container |
-| producer/requirements.txt | Python dependencies for the Producer |
-| consumer/Dockerfile | Builds the Consumer container |
-| consumer/requirements.txt | Python dependencies for the Consumer |
-| python/producer.py | Interactive Python message producer |
-| python/consumer.py | Python message consumer |
+| compose.yml | Defines multiple Docker services with combined python and nodejs producers and consumers |
+| python-lab.yml | Defines the three Docker services only python clients |
+| nodejs-lab.yml | Defines the three Docker services only nodejs clients |
+| broker/broker.xml | custom Artemis configuration - enables Stomp Websocket which is required by the NodeJS apps |
+| python/producer/Dockerfile | Builds the Python Producer container |
+| python/producer/requirements.txt | Python dependencies for the python Producer |
+| python/producer/producer.py | Interactive Python message producer |
+| python/consumer/Dockerfile | Builds the Python Consumer container |
+| python/consumer/requirements.txt | Python dependencies for the Consumer |
+| python/consumer/consumer.py | Python message consumer |
+| nodejs/package.json | NodeJS dependencies for both Producer and Consumer apps |
+| nodejs/producer/Dockerfile | Builds the NodeJS Producer container |
+| nodejs/producer/producer.js | Interactive NodeJS message producer |
+| nodejs/consumer/Dockerfile | Builds the NodeJS Consumer container |
+| nodejs/consumer/consumer.js | NodeJS message consumer |
 
 ---
 
@@ -148,8 +170,8 @@ docker compose up -d --build
 Docker Compose will:
 
 - Download the ActiveMQ Artemis image.
-- Build the Producer image.
-- Build the Consumer image.
+- Build the Producer images.
+- Build the Consumer images.
 - Create the Docker network.
 - Start the three containers.
 
@@ -164,8 +186,9 @@ You should see three running containers:
 | Container | Service |
 |---|---|
 | activemq-broker | broker |
-| activemq-producer | producer |
-| activemq-consumer | consumer |
+| python-producer | producer |
+| python-consumer | consumer |
+| nodejs-consumer | consumer |
 
 Check the broker logs:
 
@@ -202,12 +225,12 @@ The management console allows you to explore the broker and inspect queues, addr
 
 Both Python applications are designed to run interactively from Bash.
 
-### 1. Start the Consumer
+### 1. Start the Python Consumer
 
 Open a terminal and execute:
 
 ```bash
-docker exec -it activemq-consumer bash
+docker exec -it python-consumer bash
 ```
 
 Inside the container, run:
@@ -232,10 +255,36 @@ Leave this terminal running.
 
 ### 2. Start the Producer
 
+In another terminal run:
+
+```bash
+docker exec -it nodejs-consumer bash
+```
+
+Inside the container, run:
+
+```bash
+node consumer.js
+```
+
+Expected output:
+
+```text
+Starting consumer...
+Connected to ActiveMQ!
+Listening on /queue/lab.queue
+Heartbeats enabled: 10 seconds
+Press CTRL+C to stop.
+```
+
+The Consumer is now listening for messages.
+
+### 3. Start the Python Producer
+
 Open a second terminal:
 
 ```bash
-docker exec -it activemq-producer bash
+docker exec -it python-producer bash
 ```
 
 Inside the container, run:
@@ -258,7 +307,7 @@ Message >
 
 The Producer is now ready to send messages.
 
-### 3. Send your first message
+### 4. Send your first message
 
 In the Producer terminal, enter:
 
@@ -323,7 +372,7 @@ This experiment demonstrates an important characteristic of message brokers: pro
 5. Restart the Consumer:
 
 ```bash
-docker exec -it activemq-consumer bash
+docker exec -it python-consumer bash
 
 python consumer.py
 ```
@@ -340,12 +389,12 @@ Note: This experiment assumes the broker remains running and the messages have n
 
 ### Experiment 3 – Multiple Consumers
 
-Start a second Consumer in another terminal:
+Access the NodeJS Consumer in another terminal:
 
 ```bash
-docker exec -it activemq-consumer bash
+docker exec -it nodejs-consumer bash
 
-python consumer.py
+node consumer.js
 ```
 
 You now have two Consumers subscribed to the same queue.
@@ -377,9 +426,9 @@ docker compose stop broker
 docker compose start broker
 ```
 
-4. Observe the Python applications.
+4. Observe the applications.
 
-The current Python examples do not implement automatic reconnection. You may need to restart them after restarting the broker.
+The current examples Apps do not implement automatic reconnection. You may need to restart them after restarting the broker.
 
 **What to learn:**
 
@@ -439,6 +488,42 @@ conn = stomp.Connection12(
 )
 ```
 
+The NodeJS applications use the following connection settings:
+
+| Parameter | Value |
+|---|---|
+| Broker hostname | broker |
+| STOMP port | 61614 |
+| Username | labuser |
+| Password | labpass |
+| Queue destination | /queue/lab.queue |
+| STOMP version | 1.2 |
+| Heartbeat interval | 10 seconds |
+
+
+The heartbeat configuration is:
+
+```javascript
+const client = new Client({
+    brokerURL: 'ws://broker:61614',
+
+    webSocketFactory: () => new WebSocket(
+        'ws://broker:61614'
+    ),
+
+    connectHeaders: {
+        login: 'labuser',
+        passcode: 'labpass'
+    },
+
+    reconnectDelay: 5000,
+    heartbeatIncoming: 10000,
+    heartbeatOutgoing: 10000
+});
+```
+
+The applications use STOMP heartbeats to help maintain their connections and detect communication failures.
+
 The values are expressed in milliseconds.
 
 **Important:** Heartbeats help detect and prevent idle connection timeouts. They do not provide automatic reconnection. That functionality is not yet implemented in this lab.
@@ -456,8 +541,9 @@ The values are expressed in milliseconds.
 | View running containers | `docker compose ps` |
 | View broker logs | `docker compose logs -f broker` |
 | View all logs | `docker compose logs -f` |
-| Open Producer shell | `docker exec -it activemq-producer bash` |
-| Open Consumer shell | `docker exec -it activemq-consumer bash` |
+| Open Python Producer shell | `docker exec -it python-producer bash` |
+| Open Python Consumer shell | `docker exec -it python-consumer bash` |
+| Open NodeJS Consumer shell | `docker exec -it nodejs-consumer bash` |
 | Stop and remove containers | `docker compose down` |
 
 ### Completely reset the lab

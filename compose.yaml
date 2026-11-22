@@ -10,26 +10,49 @@ services:
     ports:
       - "8161:8161"
       - "61613:61613"
+      - "61614:61614"
+    volumes:
+      - ./broker:/var/lib/artemis-instance/etc-override
     networks:
       - activemq-network
 
-  producer:
+  python-producer:
     build:
       context: .
-      dockerfile: producer/Dockerfile
+      dockerfile: python/producer/Dockerfile
     container_name: activemq-producer
     command: sleep infinity
     depends_on:
       - broker
     networks:
       - activemq-network
+  
+#  nodejs-producer:
+#    build:
+#      context: .
+#      dockerfile: nodejs/producer/Dockerfile
+#    container_name: activemq-producer
+#    depends_on:
+#      - broker
+#    networks:
+#      - activemq-network
 
-  consumer:
+  python-consumer:
     build:
       context: .
-      dockerfile: consumer/Dockerfile
-    container_name: activemq-consumer
+      dockerfile: python/consumer/Dockerfile
+    container_name: python-consumer
     command: sleep infinity
+    depends_on:
+      - broker
+    networks:
+      - activemq-network
+
+  nodejs-consumer:
+    build:
+      context: .
+      dockerfile: nodejs/consumer/Dockerfile
+    container_name: nodejs-consumer
     depends_on:
       - broker
     networks:
@@ -38,4 +61,3 @@ services:
 networks:
   activemq-network:
     driver: bridge
-
